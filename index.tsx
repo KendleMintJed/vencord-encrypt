@@ -56,6 +56,14 @@ export default definePlugin({
     authors: [{name: "KendleMintJed", id: 308673958730006529n}],
     settings,
 
+    start() {
+        if (CryptoJS != undefined) return;
+
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js';
+        document.head.appendChild(script);
+    },
+
     renderMessagePopoverButton(message) {
         return {
             label: "Decrypt Message",
@@ -69,8 +77,12 @@ export default definePlugin({
                         // is valid AES block size: 16 bytes or 64/3 characters padded to the nearest 4
                         && Math.ceil(Math.floor(match.length * 3 / 64) * 16 / 3 ) * 4 == match.length);
 
-                const content = encrypted_message
-                    ? encrypted_messages .reduce(
+                const decrypted_messages = encrypted_messages.map(
+                    (cipher_text) => CryptoJS.AES.decrypt(cipher_text, "password").toString(CryptoJS.enc.Utf8)
+                );
+
+                const content = decrypted_messages
+                    ? decrypted_messages .reduce(
                         (acc, match) => {return {content: `${acc.content}\nMatch ${acc.i}: ${match}`, i: acc.i + 1}},
                         {content: "", i: 1}
                     ).content.trim()
