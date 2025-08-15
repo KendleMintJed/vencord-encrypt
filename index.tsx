@@ -48,6 +48,8 @@ const settings = definePluginSettings({
     }
 })
 
+const BASE64_REGEX = new RegExp(/[A-Za-z0-9+\/]+={0,3}/g);
+
 export default definePlugin({
     name: "Encrypt",
     description: "Symetrically encrypt/decrypt text in Discord!",
@@ -61,10 +63,23 @@ export default definePlugin({
             message: message,
             channel: ChannelStore.getChannel(message.channel_id),
             onClick: async () => {
+                const encrypted_messages = message?.content
+                    .match(BASE64_REGEX)
+                    ?.filter((match) => match.length >= 44
+                        // is valid AES block size: 16 bytes or 64/3 characters padded to the nearest 4
+                        && Math.ceil(Math.floor(match.length * 3 / 64) * 16 / 3 ) * 4 == match.length);
+
+                const content = encrypted_message
+                    ? encrypted_messages .reduce(
+                        (acc, match) => {return {content: `${acc.content}\nMatch ${acc.i}: ${match}`, i: acc.i + 1}},
+                        {content: "", i: 1}
+                    ).content.trim()
+                    : "No Base64 found."
+
                 sendBotMessage(
                     message.channel_id,
                     {
-                        content: message?.content,
+                        content,
                         author: UserStore.getCurrentUser(),
                     }
                 )
