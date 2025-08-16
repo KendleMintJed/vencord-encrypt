@@ -50,6 +50,8 @@ const settings = definePluginSettings({
 
 const BASE64_REGEX = new RegExp(/[A-Za-z0-9+\/]+={0,3}/g);
 
+var CryptoJS;
+
 export default definePlugin({
     name: "Encrypt",
     description: "Symetrically encrypt/decrypt text in Discord!",
@@ -61,6 +63,7 @@ export default definePlugin({
 
         const script = document.createElement('script');
         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js';
+        script.onload = () => {CryptoJS = window.CryptoJS;}
         document.head.appendChild(script);
     },
 
@@ -71,6 +74,17 @@ export default definePlugin({
             message: message,
             channel: ChannelStore.getChannel(message.channel_id),
             onClick: async () => {
+                if (!CryptoJS) {
+                    sendBotMessage(
+                        message.channel_id,
+                        {
+                            content: "Error: CryptoJS is undefined.",
+                            author: UserStore.getCurrentUser(),
+                        }
+                    )
+                    return;
+                }
+
                 const encrypted_messages = message?.content
                     .match(BASE64_REGEX)
                     ?.filter((match) => match.length >= 44
@@ -83,7 +97,7 @@ export default definePlugin({
 
                 const content = decrypted_messages
                     ? decrypted_messages .reduce(
-                        (acc, match) => {return {content: `${acc.content}\nMatch ${acc.i}: ${match}`, i: acc.i + 1}},
+                        (acc, match) => {return {content: `${acc.content}\nLink ${acc.i}: ${match}`, i: acc.i + 1}},
                         {content: "", i: 1}
                     ).content.trim()
                     : "No Base64 found."
