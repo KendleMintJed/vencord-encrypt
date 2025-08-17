@@ -92,7 +92,7 @@ export default definePlugin({
                         && Math.ceil(Math.floor(match.length * 3 / 64) * 16 / 3 ) * 4 == match.length);
 
                 const decrypted_messages = encrypted_messages.map(
-                    (cipher_text) => CryptoJS.AES.decrypt(cipher_text, "password").toString(CryptoJS.enc.Utf8)
+                    (cipher_text) => CryptoJS.AES.decrypt(cipher_text, settings.store.defaultPassword).toString(CryptoJS.enc.Utf8)
                 );
 
                 const content = decrypted_messages
