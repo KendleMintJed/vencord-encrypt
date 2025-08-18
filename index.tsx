@@ -1,6 +1,7 @@
 import { ChatBarButton, ChatBarButtonFactory } from "@api/ChatButtons";
 import { definePluginSettings } from "@api/Settings"
 import definePlugin, { OptionType } from "@utils/types";
+import { updateMessage } from "@api/MessageUpdater";
 import { ChannelStore, UserStore } from "@webpack/common";
 import { sendBotMessage } from "@api/Commands";
 
@@ -48,7 +49,7 @@ const settings = definePluginSettings({
     }
 })
 
-const BASE64_REGEX = new RegExp(/`?[A-Za-z0-9+\/]+={0,3}`?/g);
+const BASE64_REGEX = new RegExp(/`?([A-Za-z0-9+/]{41,}={0,3})`?/g);
 
 var CryptoJS;
 
@@ -68,6 +69,9 @@ export default definePlugin({
     },
 
     renderMessagePopoverButton(message) {
+        if (message.content.match(BASE64_REGEX) == null)
+            return null;
+
         return {
             label: "Decrypt Message",
             icon: PopOverIcon,
@@ -85,50 +89,16 @@ export default definePlugin({
                     return;
                 }
 
-                const encrypted_messages = message?.content
-                    .match(BASE64_REGEX)
-                    ?.map((match) => match.replaceAll("`", ""))
-                    .filter((match) => {
-                        return match.length >= 44
-                        // is valid AES block size: 16 bytes or 64/3 characters padded to the nearest 4
-                        && Math.ceil(Math.floor(match.length * 3 / 64) * 16 / 3 ) * 4 == match.length;
-                    });
-
-                message.content = message.content.replaceAll(
+                updateMessage(message.channel_id, message.id, {content: message.content.replaceAll(
                     BASE64_REGEX,
-                    (match) => {
-                        const inner = match.replaceAll("`", "");
-                        console.log(`Match: ${inner}`);
-
-                        if (inner.length < 44
+                    (match, inner) => {
                         // is valid AES block size: 16 bytes or 64/3 characters padded to the nearest 4
-                        || Math.ceil(Math.floor(inner.length * 3 / 64) * 16 / 3 ) * 4 != inner.length)
+                        if (Math.ceil(Math.floor(inner.length * 3 / 64) * 16 / 3 ) * 4 != inner.length)
                             return match;
-
-                        const message = CryptoJS.AES.decrypt(inner, settings.store.defaultPassword).toString(CryptoJS.enc.Utf8);
-                        console.log(`Message: ${message}`);
-                        return message;
+                        return CryptoJS.AES.decrypt(inner, settings.store.defaultPassword).toString(CryptoJS.enc.Utf8);
                     }
-                );
+                )});
 
-                const decrypted_messages = encrypted_messages.map(
-                    (cipher_text) => CryptoJS.AES.decrypt(cipher_text, settings.store.defaultPassword).toString(CryptoJS.enc.Utf8)
-                );
-
-                const content = decrypted_messages.length > 0
-                    ? decrypted_messages.reduce(
-                        (acc, match) => {return {content: `${acc.content}\nLink ${acc.i}: ${match}`, i: acc.i + 1}},
-                        {content: "", i: 1}
-                    ).content.trim()
-                    : "No Base64 found."
-
-                sendBotMessage(
-                    message.channel_id,
-                    {
-                        content,
-                        author: UserStore.getCurrentUser(),
-                    }
-                )
             }
         }
     },
